@@ -1,9 +1,33 @@
 package com.edu.platform.content;
 
-import jakarta.validation.constraints.NotNull;
+import javax.validation.constraints.NotNull;
 
-public record ReviewRequest(
-        @NotNull ContentStatus status,
-        String remark
-) {
+public class ReviewRequest {
+    @NotNull
+    private ContentStatus status;
+    private String remark;
+
+    public ReviewRequest() {
+    }
+
+    public ReviewRequest(ContentStatus status, String remark) {
+        this.status = status;
+        this.remark = remark;
+    }
+
+    public ContentStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(ContentStatus status) {
+        this.status = status;
+    }
+
+    public String getRemark() {
+        return remark;
+    }
+
+    public void setRemark(String remark) {
+        this.remark = remark;
+    }
 }

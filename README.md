@@ -1,6 +1,6 @@
 # EduPlatform Backend
 
-Spring Boot 3.x backend skeleton for education platform services.
+Spring Boot 2.7.x backend skeleton for education platform services (Java 8 compatible).
 
 ## 模块包结构
 

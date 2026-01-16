@@ -2,7 +2,10 @@ package com.edu.platform.content;
 
 import com.edu.platform.common.ApiResponse;
 import com.edu.platform.common.PageResponse;
-import jakarta.validation.Valid;
+import java.time.OffsetDateTime;
+import java.util.Arrays;
+import java.util.List;
+import javax.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -12,9 +15,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.time.OffsetDateTime;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/content/items")
@@ -27,9 +27,10 @@ public class ContentController {
             @RequestParam(required = false) ContentStatus status,
             @RequestParam(required = false) String keyword
     ) {
-        List<ContentResponse> items = List.of(
+        List<ContentResponse> items = Arrays.asList(
                 new ContentResponse("cnt-1", "Welcome", "Intro", "c-1", ContentStatus.APPROVED, OffsetDateTime.now()),
-                new ContentResponse("cnt-2", "Course Plan", "Outline", "c-2", ContentStatus.PENDING_REVIEW, OffsetDateTime.now())
+                new ContentResponse("cnt-2", "Course Plan", "Outline", "c-2", ContentStatus.PENDING_REVIEW,
+                        OffsetDateTime.now())
         );
         PageResponse<ContentResponse> pageResponse = new PageResponse<>(items, page, size, items.size());
         return ApiResponse.success(pageResponse);
@@ -37,8 +38,8 @@ public class ContentController {
 
     @PostMapping
     public ApiResponse<ContentResponse> createContent(@Valid @RequestBody ContentRequest request) {
-        ContentResponse response = new ContentResponse("cnt-new", request.title(), request.summary(), request.categoryId(),
-                ContentStatus.DRAFT, OffsetDateTime.now());
+        ContentResponse response = new ContentResponse("cnt-new", request.getTitle(), request.getSummary(),
+                request.getCategoryId(), ContentStatus.DRAFT, OffsetDateTime.now());
         return ApiResponse.success(response);
     }
 
@@ -54,8 +55,8 @@ public class ContentController {
             @PathVariable String contentId,
             @Valid @RequestBody ContentRequest request
     ) {
-        ContentResponse response = new ContentResponse(contentId, request.title(), request.summary(), request.categoryId(),
-                ContentStatus.DRAFT, OffsetDateTime.now());
+        ContentResponse response = new ContentResponse(contentId, request.getTitle(), request.getSummary(),
+                request.getCategoryId(), ContentStatus.DRAFT, OffsetDateTime.now());
         return ApiResponse.success(response);
     }
 
@@ -70,7 +71,7 @@ public class ContentController {
             @Valid @RequestBody ReviewRequest request
     ) {
         ContentResponse response = new ContentResponse(contentId, "Sample", "Summary", "c-1",
-                request.status(), OffsetDateTime.now());
+                request.getStatus(), OffsetDateTime.now());
         return ApiResponse.success(response);
     }
 }
