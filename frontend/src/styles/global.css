@@ -1,0 +1,24 @@
+body {
+  margin: 0;
+  background: #f5f6f8;
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.list-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.list-filter .ant-card-body {
+  padding-bottom: 0;
+}
+
+.filter-actions {
+  display: flex;
+  align-items: flex-end;
+}
