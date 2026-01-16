@@ -7,6 +7,7 @@ import {
   DatePicker,
   Form,
   Input,
+  InputNumber,
   Modal,
   Row,
   Select,
@@ -36,8 +37,19 @@ const defaultQuery: ListQuery = {
 
 const statusOptions = [
   { label: '全部', value: '' },
-  { label: '启用', value: 'active' },
-  { label: '停用', value: 'inactive' }
+  { label: '上架', value: 'on' },
+  { label: '下架', value: 'off' }
+];
+
+const jumpTypeOptions = [
+  { label: '当前窗口', value: '_self' },
+  { label: '新窗口', value: '_blank' }
+];
+
+const auditStatusOptions = [
+  { label: '待审核', value: 'pending' },
+  { label: '已通过', value: 'approved' },
+  { label: '已拒绝', value: 'rejected' }
 ];
 
 const ListPage = ({ title, moduleKey, fetchList, createItem, updateItem }: ListPageProps) => {
@@ -48,13 +60,19 @@ const ListPage = ({ title, moduleKey, fetchList, createItem, updateItem }: ListP
   const [data, setData] = useState<ListItem[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingItem, setEditingItem] = useState<ListItem | null>(null);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([]);
   const [messageApi, contextHolder] = message.useMessage();
 
   const loadData = async (nextQuery: ListQuery) => {
     setLoading(true);
     try {
       const response = await fetchList(nextQuery);
-      setData(response.items);
+      setData(
+        response.items.map((item, index) => ({
+          ...item,
+          sortOrder: item.sortOrder ?? index + 1
+        }))
+      );
     } catch (error) {
       messageApi.error('列表数据获取失败');
     } finally {
@@ -83,8 +101,12 @@ const ListPage = ({ title, moduleKey, fetchList, createItem, updateItem }: ListP
   const handleOpenModal = (record?: ListItem) => {
     setEditingItem(record ?? null);
     modalForm.setFieldsValue({
-      name: record?.name,
-      status: record?.status ?? 'active',
+      title: record?.title,
+      url: record?.url,
+      jumpType: record?.jumpType ?? '_self',
+      auditStatus: record?.auditStatus ?? 'pending',
+      status: record?.status ?? 'on',
+      sortOrder: record?.sortOrder ?? data.length + 1,
       owner: record?.owner,
       description: record?.description
     });
@@ -116,27 +138,95 @@ const ListPage = ({ title, moduleKey, fetchList, createItem, updateItem }: ListP
     }
   };
 
+  const handleMove = (record: ListItem, direction: 'up' | 'down') => {
+    setData((prev) => {
+      const currentIndex = prev.findIndex((item) => item.id === record.id);
+      if (currentIndex < 0) {
+        return prev;
+      }
+      const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+      if (targetIndex < 0 || targetIndex >= prev.length) {
+        return prev;
+      }
+      const next = [...prev];
+      [next[currentIndex], next[targetIndex]] = [next[targetIndex], next[currentIndex]];
+      return next.map((item, index) => ({
+        ...item,
+        sortOrder: index + 1
+      }));
+    });
+    messageApi.success(direction === 'up' ? '已上移' : '已下移');
+  };
+
+  const handleBatchDelete = () => {
+    if (selectedRowKeys.length === 0) {
+      messageApi.warning('请先选择要删除的条目');
+      return;
+    }
+    Modal.confirm({
+      title: '确认删除',
+      content: `确定要删除选中的 ${selectedRowKeys.length} 条记录吗？`,
+      okText: '删除',
+      cancelText: '取消',
+      onOk: () => {
+        setData((prev) => prev.filter((item) => !selectedRowKeys.includes(item.id)));
+        setSelectedRowKeys([]);
+        messageApi.success('批量删除成功');
+      }
+    });
+  };
+
+  const handleRefresh = () => {
+    loadData(query);
+  };
+
   const columns: ColumnsType<ListItem> = useMemo(
     () => [
       {
-        title: '名称',
-        dataIndex: 'name',
-        key: 'name'
+        title: '标题',
+        dataIndex: 'title',
+        key: 'title'
       },
       {
-        title: '负责人',
-        dataIndex: 'owner',
-        key: 'owner'
+        title: 'URL',
+        dataIndex: 'url',
+        key: 'url'
+      },
+      {
+        title: '跳转方式',
+        dataIndex: 'jumpType',
+        key: 'jumpType',
+        render: (jumpType: ListItem['jumpType']) =>
+          jumpType === '_blank' ? '新窗口' : '当前窗口'
+      },
+      {
+        title: '审核状态',
+        dataIndex: 'auditStatus',
+        key: 'auditStatus',
+        render: (auditStatus: ListItem['auditStatus']) => {
+          const mapping = {
+            pending: { color: 'gold', label: '待审核' },
+            approved: { color: 'green', label: '已通过' },
+            rejected: { color: 'red', label: '已拒绝' }
+          } as const;
+          const result = mapping[auditStatus ?? 'pending'];
+          return <Tag color={result.color}>{result.label}</Tag>;
+        }
       },
       {
         title: '状态',
         dataIndex: 'status',
         key: 'status',
         render: (status: ListItem['status']) => (
-          <Tag color={status === 'active' ? 'green' : 'red'}>
-            {status === 'active' ? '启用' : '停用'}
+          <Tag color={status === 'on' ? 'green' : 'red'}>
+            {status === 'on' ? '上架' : '下架'}
           </Tag>
         )
+      },
+      {
+        title: '排序号',
+        dataIndex: 'sortOrder',
+        key: 'sortOrder'
       },
       {
         title: '更新时间',
@@ -151,14 +241,25 @@ const ListPage = ({ title, moduleKey, fetchList, createItem, updateItem }: ListP
             <Button type="link" onClick={() => handleOpenModal(record)}>
               编辑
             </Button>
-            <Button type="link" danger>
-              下线
+            <Button
+              type="link"
+              onClick={() => handleMove(record, 'up')}
+              disabled={data.findIndex((item) => item.id === record.id) === 0}
+            >
+              上移
+            </Button>
+            <Button
+              type="link"
+              onClick={() => handleMove(record, 'down')}
+              disabled={data.findIndex((item) => item.id === record.id) === data.length - 1}
+            >
+              下移
             </Button>
           </Space>
         )
       }
     ],
-    [moduleKey]
+    [data, moduleKey]
   );
 
   return (
@@ -173,7 +274,7 @@ const ListPage = ({ title, moduleKey, fetchList, createItem, updateItem }: ListP
               </Form.Item>
             </Col>
             <Col span={6}>
-              <Form.Item label="状态" name="status">
+              <Form.Item label="上/下架状态" name="status">
                 <Select options={statusOptions} placeholder="请选择" />
               </Form.Item>
             </Col>
@@ -200,6 +301,10 @@ const ListPage = ({ title, moduleKey, fetchList, createItem, updateItem }: ListP
         extra={
           <Space>
             <Button>导出</Button>
+            <Button onClick={handleRefresh}>刷新</Button>
+            <Button danger onClick={handleBatchDelete} disabled={selectedRowKeys.length === 0}>
+              批量删除
+            </Button>
             <Button type="primary" onClick={() => handleOpenModal()}>
               新增{title}
             </Button>
@@ -212,6 +317,10 @@ const ListPage = ({ title, moduleKey, fetchList, createItem, updateItem }: ListP
           dataSource={data}
           loading={loading}
           pagination={{ pageSize: 10 }}
+          rowSelection={{
+            selectedRowKeys,
+            onChange: (keys) => setSelectedRowKeys(keys as string[])
+          }}
         />
       </Card>
 
@@ -226,18 +335,46 @@ const ListPage = ({ title, moduleKey, fetchList, createItem, updateItem }: ListP
       >
         <Form form={modalForm} layout="vertical" preserve={false}>
           <Form.Item
-            label="名称"
-            name="name"
-            rules={[{ required: true, message: '请输入名称' }]}
+            label="标题"
+            name="title"
+            rules={[{ required: true, message: '请输入标题' }]}
           >
-            <Input placeholder={`请输入${title}名称`} />
+            <Input placeholder={`请输入${title}标题`} />
           </Form.Item>
           <Form.Item
-            label="状态"
+            label="URL"
+            name="url"
+            rules={[{ required: true, message: '请输入URL' }]}
+          >
+            <Input placeholder="请输入URL" />
+          </Form.Item>
+          <Form.Item
+            label="跳转方式"
+            name="jumpType"
+            rules={[{ required: true, message: '请选择跳转方式' }]}
+          >
+            <Select options={jumpTypeOptions} placeholder="请选择跳转方式" />
+          </Form.Item>
+          <Form.Item
+            label="审核状态"
+            name="auditStatus"
+            rules={[{ required: true, message: '请选择审核状态' }]}
+          >
+            <Select options={auditStatusOptions} placeholder="请选择审核状态" />
+          </Form.Item>
+          <Form.Item
+            label="上/下架状态"
             name="status"
-            rules={[{ required: true, message: '请选择状态' }]}
+            rules={[{ required: true, message: '请选择上/下架状态' }]}
           >
             <Select options={statusOptions.filter((option) => option.value)} />
+          </Form.Item>
+          <Form.Item
+            label="排序号"
+            name="sortOrder"
+            rules={[{ required: true, message: '请输入排序号' }]}
+          >
+            <InputNumber className="full-width" min={1} placeholder="请输入排序号" />
           </Form.Item>
           <Form.Item label="负责人" name="owner">
             <Input placeholder="请输入负责人" />
